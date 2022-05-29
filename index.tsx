@@ -5,6 +5,7 @@ import { every, filter, isNil, last, map, omit } from 'lodash';
 import { SheetComponent } from '@antv/s2-react';
 import insertCss from 'insert-css';
 import { defaultHouseInfo, dataConfig, s2Options } from './config';
+import 'antd/dist/antd.css';
 
 const SelectItem = (props) => {
   const { data, dataName, onChange } = props;
