@@ -1,112 +1,161 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Switch, Button } from 'antd';
+import { Select, InputNumber, Space } from 'antd';
+import { every, filter, isNil, last, map, omit } from 'lodash';
 import { SheetComponent } from '@antv/s2-react';
-import { EXTRA_FIELD, TOTAL_VALUE, SpreadSheet } from '@antv/s2';
-
 import insertCss from 'insert-css';
-import data from './data';
+import { defaultHouseInfo, dataConfig, s2Options } from './config';
 
-import 'antd/dist/antd.css';
-import '@antv/s2-react/dist/style.min.css';
+const SelectItem = (props) => {
+  const { data, dataName, onChange } = props;
 
-//  'https://gw.alipayobjects.com/os/bmw-prod/2a5dbbc8-d0a7-4d02-b7c9-34f6ca63cff6.json',
-// https://gw.alipayobjects.com/os/bmw-prod/ad982192-a708-4732-99af-153f422e7b75.json
-
-// sort by measure  is error
-const dataCfg = {
-  ...data,
-  fields: {
-    ...data.fields,
-  },
-  sortParams: [
-    // {
-    //   sortFieldId: 'city',
-    //   sortByMeasure: 'price',
-    //   sortMethod: 'asc',
-    //   query: {
-    //     type: '纸张',
-    //     [EXTRA_FIELD]: 'price',
-    //   },
-    // },
-  ],
-};
-const s2Options = {
-  width: 800,
-  height: 880,
-  // hierarchyType: 'grid',
-  // totals: {
-  // row: {
-  //   reverseSubLayout: true,
-  //   // showSubTotals: true,
-  //   showGrandTotals: true,
-  //   subTotalsDimensions: ['province', 'city'],
-  //   calcSubTotals: {
-  //     aggregation: 'SUM',
-  //   },
-  //   calcTotals: {
-  //     aggregation: 'SUM',
-  //   },
-  // },
-  // col: {
-  //   // showSubTotals: true,
-  //   // showGrandTotals: true,
-  //   subTotalsDimensions: ['type'],
-  //   calcTotals: {
-  //     aggregation: 'SUM',
-  //   },
-  //   calcSubTotals: {
-  //     aggregation: 'SUM',
-  //   },
-  // },
-  // },
+  return (
+    <Select
+      allowClear={true}
+      placeholder="全部"
+      style={{ width: '150px' }}
+      onChange={(value) => {
+        onChange({
+          key: dataName,
+          value: value,
+        });
+      }}
+    >
+      {map(data, (item) => (
+        <Select.Option key={`${item}`} value={item}>
+          {`${item}`}
+        </Select.Option>
+      ))}
+    </Select>
+  );
 };
 
-const ButtonDemo = () => {
-  const [status, setStatus] = useState('asc');
-  const s2Ref = React.useRef<SpreadSheet>();
+const RangeSelect = (props) => {
+  const { data, dataName, onChange } = props;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const [info, setInfo] = useState({ min, max });
+  const handleChange = (value, key) => {
+    const tempInfo = Object.assign({}, info);
+    tempInfo[key] = value;
+    setInfo(tempInfo);
 
-  const getSpreadSheet1 = (instance: SpreadSheet) => {
-    s2Ref.current = instance;
-    console.log(instance.facet.layoutResult.rowLeafNodes, '111');
-    window.s2 = instance;
+    onChange({
+      key: dataName,
+      value: [tempInfo.min, tempInfo.max],
+    });
   };
-  const onChange = (checked: boolean) => {
-    setStatus(checked ? 'asc' : 'desc');
+
+  return (
+    <Space>
+      <InputNumber
+        placeholder={'最小值'}
+        min={min}
+        max={max}
+        defaultValue={min}
+        onChange={(e) => handleChange(e, 'min')}
+      />
+      <InputNumber
+        placeholder={'最大值'}
+        min={min}
+        max={max}
+        defaultValue={max}
+        onChange={(e) => handleChange(e, 'max')}
+      />
+    </Space>
+  );
+};
+
+const SelectList = (props) => {
+  const { filterData } = props;
+  const [filterInfo, setFilterInfo] = useState({});
+
+  const onChange = ({ key, value }) => {
+    let tempHouseInfo = Object.assign({}, filterInfo);
+    if (isNil(value)) {
+      tempHouseInfo = omit(tempHouseInfo, key);
+    } else {
+      tempHouseInfo[key] = value;
+    }
+    setFilterInfo(tempHouseInfo);
+    filterData(tempHouseInfo);
   };
-  const sortParams = dataCfg.sortParams.map((item) => {
-    return {
-      ...item,
-      sortMethod: status,
-    };
-  });
+
+  return (
+    <div className="select-list">
+      {map(defaultHouseInfo, (item, key) => {
+        return (
+          <Space className="select-item" key={key}>
+            <span className="select-label"> {key}</span>
+            {key === 'area' || key === 'level' ? (
+              <RangeSelect data={item} dataName={key} onChange={onChange} />
+            ) : (
+              <SelectItem data={item} dataName={key} onChange={onChange} />
+            )}
+          </Space>
+        );
+      })}
+    </div>
+  );
+};
+
+const Sheet = ({ data }) => {
+  const [dataSource, setDataSource] = useState(data);
+
+  const filterData = (filterInfo) => {
+    const result = filter(data, (item) => {
+      return every(filterInfo, (value, key) => {
+        if (key === 'area') {
+          return value[0] <= item.area && value[1] >= item.area;
+        }
+        if (key === 'level') {
+          return value[0] <= item.level && value[1] >= item.level;
+        }
+        if (key === 'nearStreet') {
+          console.log(item.nearStreet, 'item.nearStreet', value, 'value');
+          console.log(item.nearStreet === value, 'item.nearStreet === value');
+        }
+        return item[key] === value;
+      });
+    });
+    setDataSource(result);
+  };
 
   return (
     <div>
-      {/* <Switch
-        checkedChildren="asc"
-        unCheckedChildren="desc"
-        checked={status === 'asc'}
-        onChange={onChange}
-      /> */}
+      <SelectList filterData={filterData} />
       <SheetComponent
         sheetType={'pivot'}
-        adaptive={false}
-        dataCfg={{ ...dataCfg, sortParams }}
+        dataCfg={{ ...dataConfig, data: dataSource }}
         options={s2Options}
-        getSpreadSheet={getSpreadSheet1}
+        showPagination={true}
       />
     </div>
   );
 };
 
-ReactDOM.render(<ButtonDemo />, document.getElementById('root'));
+fetch(
+  'https://gw.alipayobjects.com/os/bmw-prod/6420f338-9169-4b1f-b0f0-35f1a8295e67.json'
+)
+  .then((res) => res.json())
+  .then((data) => {
+    ReactDOM.render(<Sheet data={data} />, document.getElementById('root'));
+  });
 
 // We use 'insert-css' to insert custom styles
 // It is recommended to add the style to your own style sheet files
 // If you want to copy the code directly, please remember to install the npm package 'insert-css
 insertCss(`
-  .antv-s2-switcher-item.checkable-item {
-    align-items: center;
+  .select-item {
+      margin: 5px 16px 0 0;
+  }
+  .select-list {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+  }
+  .select-label {
+    display: inline-block;
+    width: 80px;
   }
 `);
